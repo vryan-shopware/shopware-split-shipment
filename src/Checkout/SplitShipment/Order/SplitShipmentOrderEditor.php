@@ -24,8 +24,10 @@ use Shopware\Core\Checkout\Order\OrderEntity;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepository;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
+use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsAnyFilter;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsFilter;
 use Shopware\Core\Framework\Uuid\Uuid;
+use Shopware\Core\System\Country\Aggregate\CountryState\CountryStateCollection;
 use Shopware\Core\System\Country\CountryCollection;
 use Shopware\Core\System\Country\CountryEntity;
 use Shopware\Core\System\SalesChannel\SalesChannelContext;
@@ -67,12 +69,14 @@ class SplitShipmentOrderEditor
      * @param EntityRepository<CustomerAddressCollection> $customerAddressRepository
      * @param EntityRepository<TaxCollection> $taxRepository
      * @param EntityRepository<CountryCollection> $countryRepository
+     * @param EntityRepository<CountryStateCollection> $countryStateRepository
      */
     public function __construct(
         private readonly EntityRepository $orderRepository,
         private readonly EntityRepository $customerAddressRepository,
         private readonly EntityRepository $taxRepository,
         private readonly EntityRepository $countryRepository,
+        private readonly EntityRepository $countryStateRepository,
         private readonly EntityRepository $orderDeliveryRepository,
         private readonly EntityRepository $orderDeliveryPositionRepository,
         private readonly EntityRepository $orderLineItemRepository,
@@ -139,6 +143,25 @@ class SplitShipmentOrderEditor
             }
         }
 
+        // States of the countries in play, for address editing.
+        $countryIds = array_values(array_unique(array_filter(array_merge(
+            array_map(static fn (array $shipment) => $shipment['address']['countryId'] ?? null, $shipments),
+            array_map(static fn (array $address) => $address['countryId'] ?? null, $customerAddresses)
+        ))));
+        $countryStates = [];
+        if ($countryIds !== []) {
+            $criteria = (new Criteria())->addFilter(new EqualsAnyFilter('countryId', $countryIds));
+            foreach ($this->countryStateRepository->search($criteria, $context)->getEntities() as $state) {
+                $countryStates[] = [
+                    'id' => $state->getId(),
+                    'countryId' => $state->getCountryId(),
+                    'shortCode' => $state->getShortCode(),
+                    'name' => $state->getTranslation('name'),
+                ];
+            }
+            usort($countryStates, static fn (array $a, array $b) => strcmp((string) $a['name'], (string) $b['name']));
+        }
+
         return [
             'orderId' => $order->getId(),
             'taxStatus' => $order->getTaxStatus(),
@@ -146,6 +169,7 @@ class SplitShipmentOrderEditor
             'lineItems' => $lines,
             'shipments' => $shipments,
             'customerAddresses' => $customerAddresses,
+            'countryStates' => $countryStates,
         ];
     }
 

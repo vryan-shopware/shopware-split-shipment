@@ -42,6 +42,7 @@
             <argument type="service" id="customer_address.repository"/>
             <argument type="service" id="tax.repository"/>
             <argument type="service" id="country.repository"/>
+            <argument type="service" id="country_state.repository"/>
             <argument type="service" id="order_delivery.repository"/>
             <argument type="service" id="order_delivery_position.repository"/>
             <argument type="service" id="order_line_item.repository"/>

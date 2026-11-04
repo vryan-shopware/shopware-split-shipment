@@ -2,6 +2,7 @@
 
 namespace DemoSplitShipment\Checkout\SplitShipment\Order;
 
+use Shopware\Core\Framework\Api\Context\SystemSource;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\Uuid\Uuid;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -20,7 +21,9 @@ use Symfony\Component\Routing\Attribute\Route;
  *      Body: the shipment plan. Reprices the order and returns the new state.
  *
  * Both work on the order version in the `sw-version-id` header, like the admin's
- * own order edits. Apps (such as Sales Agent) need order read/update permissions.
+ * own order edits. Access is decided by the route's order read/update check; the
+ * edit itself touches deliveries, addresses, taxes and countries, so it runs with
+ * system rights. That way an app such as Sales Agent only needs order permissions.
  */
 #[Route(defaults: ['_routeScope' => ['api']])]
 class SplitShipmentOrderRoute
@@ -39,7 +42,7 @@ class SplitShipmentOrderRoute
     {
         $this->validateId($orderId);
 
-        return new JsonResponse($this->editor->describe($orderId, $context));
+        return new JsonResponse($this->editor->describe($orderId, $this->system($context)));
     }
 
     #[Route(
@@ -53,9 +56,25 @@ class SplitShipmentOrderRoute
         $this->validateId($orderId);
 
         $plan = $request->toArray();
-        $this->editor->apply($orderId, $plan, $context);
+        $system = $this->system($context);
+        $this->editor->apply($orderId, $plan, $system);
 
-        return new JsonResponse($this->editor->describe($orderId, $context));
+        return new JsonResponse($this->editor->describe($orderId, $system));
+    }
+
+    private function system(Context $context): Context
+    {
+        return new Context(
+            new SystemSource(),
+            $context->getRuleIds(),
+            $context->getCurrencyId(),
+            $context->getLanguageIdChain(),
+            $context->getVersionId(),
+            $context->getCurrencyFactor(),
+            $context->considerInheritance(),
+            $context->getTaxState(),
+            $context->getRounding()
+        );
     }
 
     private function validateId(string $orderId): void
