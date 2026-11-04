@@ -1,0 +1,23 @@
+{
+    "demo-split-shipment": {
+        "card": {
+            "title": "Shipments | Shipments ({count}) | Shipments ({count})",
+            "intro": "This order ships to several addresses. Each shipment has its own address, items, shipping and status.",
+            "shipment": "Shipment {index} of {count}",
+            "items": "No units | 1 unit | {count} units",
+            "shipping": "Shipping",
+            "shipBy": "Ship by {date}",
+            "status": "Status",
+            "tracking": "Tracking codes",
+            "trackingPlaceholder": "Comma-separated",
+            "totalShipping": "Total shipping",
+            "statusSaved": "Shipment to {place} updated.",
+            "statusFailed": "The shipment status could not be changed.",
+            "trackingSaved": "Tracking codes saved.",
+            "trackingFailed": "The tracking codes could not be saved."
+        },
+        "summary": {
+            "shipping": "Shipping costs | Shipping costs (1 shipment) | Shipping costs ({count} shipments)"
+        }
+    }
+}

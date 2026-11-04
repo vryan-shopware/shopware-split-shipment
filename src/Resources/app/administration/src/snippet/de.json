@@ -1,0 +1,23 @@
+{
+    "demo-split-shipment": {
+        "card": {
+            "title": "Lieferungen | Lieferungen ({count}) | Lieferungen ({count})",
+            "intro": "Diese Bestellung geht an mehrere Adressen. Jede Lieferung hat eigene Adresse, Positionen, Versandkosten und Status.",
+            "shipment": "Lieferung {index} von {count}",
+            "items": "Keine Einheiten | 1 Einheit | {count} Einheiten",
+            "shipping": "Versand",
+            "shipBy": "Versand bis {date}",
+            "status": "Status",
+            "tracking": "Sendungsnummern",
+            "trackingPlaceholder": "Durch Komma getrennt",
+            "totalShipping": "Versandkosten gesamt",
+            "statusSaved": "Lieferung nach {place} aktualisiert.",
+            "statusFailed": "Der Lieferstatus konnte nicht geändert werden.",
+            "trackingSaved": "Sendungsnummern gespeichert.",
+            "trackingFailed": "Die Sendungsnummern konnten nicht gespeichert werden."
+        },
+        "summary": {
+            "shipping": "Versandkosten | Versandkosten (1 Lieferung) | Versandkosten ({count} Lieferungen)"
+        }
+    }
+}

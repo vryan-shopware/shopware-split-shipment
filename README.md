@@ -33,6 +33,12 @@ Two cart processors:
 
 Admin order edits that keep the original shipping costs (`SKIP_DELIVERY_PRICE_RECALCULATION`) are left alone.
 
+## Admin
+
+Shopware's order page assumes one delivery per order: it shows the primary delivery's address and status, and lists every other delivery in the summary as a shipping discount. For split-shipment orders the plugin adds a **Shipments** card under the line items (one row per destination with address, items and units, shipping cost and method, status and tracking codes; status and tracking can be changed per shipment) and labels the summary line "Shipping costs (3 shipments)".
+
+The admin code is one file without imports, `src/Resources/app/administration/src/main.js`. `node bin/build-admin.mjs` publishes it to `src/Resources/public/administration` in the layout the 6.7 admin build produces, so the Shopware admin toolchain isn't needed. Run it after changing `main.js`, then `bin/console assets:install` on the shop. Text lives in `snippet/en.json` and `snippet/de.json`.
+
 ## Storefront
 
 The demo's headless storefront (shopware-demo-frontend) shows a "Ship to multiple addresses" step at checkout when this plugin answers `/store-api/split-shipment`, and switches the order summary to the live Shopware totals (shipments, shipping, tax by rate). The Twig storefront has no UI for it yet.
@@ -44,6 +50,7 @@ Copy this folder to `custom/plugins/DemoSplitShipment`, then:
 ```bash
 bin/console plugin:refresh
 bin/console plugin:install --activate DemoSplitShipment
+bin/console assets:install
 bin/console cache:clear
 ```
 
