@@ -2,7 +2,8 @@
 //   - Standard shipping costs a flat amount per shipment (so per-destination charges show)
 //   - the demo buyer gets store addresses in other states
 //
-//   node tests/demo-setup.mjs --provisioning=<path to *-provisioning.json> [--email=admin@shopware.com] [--shipping=12.95]
+//   node tests/demo-setup.mjs --provisioning=<path to *-provisioning.json> [--email=admin@shopware.com]
+//     [--shipping=12.95] [--company="Acme Buying Team"]
 
 import { readFileSync } from "node:fs";
 import { adminClient, arg } from "./lib.mjs";
@@ -10,11 +11,12 @@ import { adminClient, arg } from "./lib.mjs";
 const provisioning = JSON.parse(readFileSync(arg("provisioning"), "utf8"));
 const email = arg("email", "admin@shopware.com");
 const shippingPrice = Number(arg("shipping", "12.95"));
+const company = arg("company", "Demo Buying Team");
 const admin = await adminClient(provisioning);
 
 const ADDRESSES = [
-  { key: "va", company: "Evergreen Demo Buying Team · Richmond store", street: "8100 Patterson Avenue", city: "Richmond", zipcode: "23229", state: "US-VA" },
-  { key: "tx", company: "Evergreen Demo Buying Team · Austin store", street: "1810 S Lamar Boulevard", city: "Austin", zipcode: "78704", state: "US-TX" }
+  { key: "va", company: `${company} · Richmond store`, street: "8100 Patterson Avenue", city: "Richmond", zipcode: "23229", state: "US-VA" },
+  { key: "tx", company: `${company} · Austin store`, street: "1810 S Lamar Boulevard", city: "Austin", zipcode: "78704", state: "US-TX" }
 ];
 
 const shipping = (await admin.search("shipping-method", { filter: [{ type: "equals", field: "technicalName", value: "shipping_standard" }], associations: { prices: {} } })).data[0]

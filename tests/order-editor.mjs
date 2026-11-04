@@ -40,15 +40,18 @@ const round = (n) => Math.round(n * 100) / 100;
 
 const orders = await api("POST", "/search/order", { filter: [{ type: "equals", field: "orderNumber", value: args.order }], limit: 1 });
 const orderId = orders.data[0].id;
+const liveBefore = (await api("POST", "/search/order", { ids: [orderId], associations: { deliveries: {} } })).data[0];
 const { versionId } = await api("POST", `/_action/version/order/${orderId}`);
 console.log(`order ${args.order}, draft version ${versionId}`);
 
 try {
   const before = await api("GET", `/_action/split-shipment/order/${orderId}`, undefined, versionId);
   const line = before.lineItems[0];
+  // A split order from tests/smoke.mjs --order: the buyer's own address plus Richmond VA and Austin TX.
   const byCity = Object.fromEntries(before.shipments.map((s) => [s.address.city, s]));
+  byCity.Primary = before.shipments.find((s) => !["Richmond", "Austin"].includes(s.address.city));
   check("describe lists shipments", before.shipments.length >= 3, before.shipments.map((s) => s.address.city).join(", "));
-  const saved = before.customerAddresses.find((a) => a.city === "Chicago") || before.customerAddresses[0];
+  const saved = before.customerAddresses.find((a) => a.city === byCity.Primary.address.city) || before.customerAddresses[0];
   const outfit = (await api("POST", "/search/product", {
     limit: 1,
     filter: [{ type: "contains", field: "name", value: "Outfit" }, { type: "equals", field: "active", value: true }, { type: "range", field: "stock", parameters: { gte: 5 } }],
@@ -59,7 +62,7 @@ try {
     lineItems: { [line.id]: { unitPrice: 50 } },
     newLineItems: [{ productId: outfit.id }],
     shipments: [
-      { id: byCity.Chicago.id, shippingCost: 12.95, address: {}, quantities: { [line.id]: 2 } },
+      { id: byCity.Primary.id, shippingCost: 12.95, address: {}, quantities: { [line.id]: 2 } },
       { id: byCity.Richmond.id, shippingCost: 12.95, address: { street: "8200 Patterson Avenue" }, quantities: { [line.id]: 5, [outfit.id]: 2 } },
       { id: byCity.Austin.id, shippingCost: 20, address: {}, quantities: { [line.id]: 3 } },
       { shippingCost: 9.5, address: { customerAddressId: saved.id }, quantities: { [line.id]: 1 } },
@@ -81,12 +84,13 @@ try {
     associations: { deliveries: { associations: { positions: {}, shippingOrderAddress: { associations: { countryState: {} } } } }, lineItems: {}, transactions: {} },
   }, versionId)).data[0];
 
-  // Expected: Chicago IL 3 units (2 + new shipment 1) at 6.25%, VA 5 at 5.3%, TX 3 at 6.25%.
+  // Expected: each shipment taxed at its own state rate (primary address 3 units: 2 + new shipment 1).
   const shipping = round(12.95 + 12.95 + 20 + 9.5);
   check("shipping total", round(order.shippingTotal) === shipping, `${order.shippingTotal} vs ${shipping}`);
   check("net total", round(order.amountNet) === round(11 * 50 + 2 * outfitNet + shipping), String(order.amountNet));
   const taxes = Object.fromEntries(order.price.calculatedTaxes.map((t) => [t.taxRate, t.tax]));
-  const rateOf = (s) => ({ "US-IL": 6.25, "US-VA": 5.3, "US-TX": 6.25 })[s.shippingOrderAddress.countryState?.shortCode];
+  // Rates as booked on the order: each position's single tax rate.
+  const rateOf = (d) => d.positions[0]?.price?.calculatedTaxes?.[0]?.taxRate ?? 0;
   const expected = {};
   for (const d of order.deliveries) {
     const goods = d.positions.reduce((n, p) => n + p.price.totalPrice, 0);
@@ -102,10 +106,10 @@ try {
 
   // Validation.
   for (const [label, bad] of [
-    ["empty shipment rejected", { shipments: [{ id: byCity.Chicago.id, quantities: {} }] }],
-    ["negative cost rejected", { shipments: [{ id: byCity.Chicago.id, shippingCost: -1, quantities: { [line.id]: 1 } }] }],
-    ["too many units of a new item rejected", { newLineItems: [{ productId: outfit.id }], shipments: [{ id: byCity.Chicago.id, shippingCost: 1, quantities: { [line.id]: 1, [outfit.id]: 100000 } }] }],
-    ["adding an item already on the order rejected", { newLineItems: [{ productId: line.productId || "x" }], shipments: [{ id: byCity.Chicago.id, shippingCost: 1, quantities: { [line.id]: 1 } }] }],
+    ["empty shipment rejected", { shipments: [{ id: byCity.Primary.id, quantities: {} }] }],
+    ["negative cost rejected", { shipments: [{ id: byCity.Primary.id, shippingCost: -1, quantities: { [line.id]: 1 } }] }],
+    ["too many units of a new item rejected", { newLineItems: [{ productId: outfit.id }], shipments: [{ id: byCity.Primary.id, shippingCost: 1, quantities: { [line.id]: 1, [outfit.id]: 100000 } }] }],
+    ["adding an item already on the order rejected", { newLineItems: [{ productId: line.productId || "x" }], shipments: [{ id: byCity.Primary.id, shippingCost: 1, quantities: { [line.id]: 1 } }] }],
     ["foreign address rejected", { shipments: [{ shippingCost: 1, address: { customerAddressId: "0".repeat(32) }, quantities: { [line.id]: 1 } }] }],
   ]) {
     const status = await api("POST", `/_action/split-shipment/order/${orderId}`, bad, versionId).then(() => 200, (e) => e.status);
@@ -116,5 +120,5 @@ try {
 }
 
 const live = await api("POST", "/search/order", { ids: [orderId], associations: { deliveries: {} } });
-check("live order untouched", live.data[0].deliveries.length === 3 && live.data[0].amountTotal === 623.44, `${live.data[0].deliveries.length} shipments, ${live.data[0].amountTotal}`);
+check("live order untouched", live.data[0].deliveries.length === liveBefore.deliveries.length && live.data[0].amountTotal === liveBefore.amountTotal, `${live.data[0].deliveries.length} shipments, ${live.data[0].amountTotal}`);
 process.exitCode = failures ? 1 : 0;

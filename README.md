@@ -2,7 +2,7 @@
 
 Lets a signed-in buyer ship one order to several of their saved addresses. Each address becomes its own delivery, shipping is charged once or per destination, and tax follows each item's destination.
 
-Built as a demo plugin for the Evergreen prospect demo. Tested on Shopware 6.7.15.1.
+A demo plugin for Shopware prospect demos; the demo factory (shopware-demo-creator) installs it when a demo includes split shipments. Tested on Shopware 6.7.15.1.
 
 ## What it does
 
@@ -79,6 +79,6 @@ US tax rules must exist for tax by state to show anything; the demo factory's `s
 
 ## Not covered
 
-- Per-line requested ship dates (a separate light extension; see the Evergreen answers doc).
+- Per-line requested ship dates (a separate light extension).
 - Promotions that discount shipping are applied per delivery by Shopware; not specifically tested.
 - Gross-price sales channels: supported, but tested only with net (B2B) prices.

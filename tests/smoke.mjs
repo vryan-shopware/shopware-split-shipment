@@ -1,6 +1,6 @@
 // Store API smoke test for split shipments against a live demo instance.
 //
-//   node tests/smoke.mjs --provisioning=<path to *-provisioning.json> [--product=GU3S4LG26] [--order]
+//   node tests/smoke.mjs --provisioning=<path to *-provisioning.json> [--product=<productNumber>] [--email=admin@shopware.com] [--password=shopware] [--order]
 //
 // Signs in as the demo buyer, puts 10 units of one product in the cart, assigns 4 to
 // one extra address and 3 to another, and checks deliveries, shipping and tax in both
@@ -11,7 +11,9 @@ import { readFileSync } from "node:fs";
 import { adminClient, arg, storeClient } from "./lib.mjs";
 
 const provisioning = JSON.parse(readFileSync(arg("provisioning"), "utf8"));
-const productNumber = arg("product", "GU3S4LG26");
+const productNumber = arg("product");
+const email = arg("email", "admin@shopware.com");
+const password = arg("password", "shopware");
 const placeOrder = process.argv.includes("--order");
 const admin = await adminClient(provisioning);
 const store = storeClient(provisioning);
@@ -43,9 +45,16 @@ function taxByRate(cart) {
 
 await admin.setConfig({ [`${KEY}enabled`]: true, [`${KEY}shippingCostMode`]: "perDestination", [`${KEY}additionalDestinationFee`]: 0 });
 
-await store.login("admin@shopware.com", "shopware");
+await store.login(email, password);
 await store.delete("checkout/cart").catch(() => {});
-const product = (await store.post("product", { filter: [{ type: "equals", field: "productNumber", value: productNumber }], limit: 1 })).elements[0];
+// Without --product, any simple product with at least 10 units in stock.
+const product = (await store.post("product", {
+  limit: 1,
+  filter: productNumber
+    ? [{ type: "equals", field: "productNumber", value: productNumber }]
+    : [{ type: "range", field: "stock", parameters: { gte: 10 } }, { type: "equals", field: "childCount", value: 0 }]
+})).elements[0];
+if (!product) throw new Error(productNumber ? `Product ${productNumber} not found.` : "No product with 10 units in stock.");
 const unit = product.calculatedPrice.unitPrice;
 let cart = await store.post("checkout/cart/line-item", { items: [{ type: "product", referencedId: product.id, quantity: 10 }] });
 const line = cart.lineItems.find((item) => item.referencedId === product.id);
