@@ -1,0 +1,26 @@
+{
+    "name": "shopware-demo/split-shipment",
+    "description": "Ship one order to several addresses: per-destination deliveries, shipping charged once or per destination, and line-item tax by each destination's location.",
+    "version": "0.1.0",
+    "type": "shopware-platform-plugin",
+    "license": "proprietary",
+    "autoload": {
+        "psr-4": {
+            "DemoSplitShipment\\": "src/"
+        }
+    },
+    "require": {
+        "shopware/core": "~6.7.0"
+    },
+    "extra": {
+        "shopware-plugin-class": "DemoSplitShipment\\DemoSplitShipment",
+        "label": {
+            "en-GB": "Split shipments",
+            "de-DE": "Teillieferungen an mehrere Adressen"
+        },
+        "description": {
+            "en-GB": "Lets buyers ship one order to several of their addresses. Each destination becomes its own delivery, shipping can be charged once or per destination, and tax follows each destination's location.",
+            "de-DE": "Eine Bestellung an mehrere Adressen liefern, mit Versandkosten pro Ziel und Steuer nach Lieferort."
+        }
+    }
+}
