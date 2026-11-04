@@ -14,10 +14,44 @@
             "statusSaved": "Lieferung nach {place} aktualisiert.",
             "statusFailed": "Der Lieferstatus konnte nicht geändert werden.",
             "trackingSaved": "Sendungsnummern gespeichert.",
-            "trackingFailed": "Die Sendungsnummern konnten nicht gespeichert werden."
+            "trackingFailed": "Die Sendungsnummern konnten nicht gespeichert werden.",
+            "introSingle": "Diese Bestellung geht an eine Adresse. Mit \"Lieferungen bearbeiten\" lässt sie sich auf mehrere Adressen aufteilen.",
+            "edit": "Lieferungen bearbeiten"
         },
         "summary": {
             "shipping": "Versandkosten | Versandkosten (1 Lieferung) | Versandkosten ({count} Lieferungen)"
+        },
+        "editor": {
+            "title": "Lieferungen bearbeiten",
+            "items": "Positionen",
+            "item": "Position",
+            "unitPriceNet": "Stückpreis (netto)",
+            "unitPriceGross": "Stückpreis (brutto)",
+            "units": "Einheiten",
+            "lineTotal": "Summe",
+            "willBeRemoved": "wird aus der Bestellung entfernt",
+            "shipments": "Lieferungen",
+            "new": "neu",
+            "remove": "Entfernen",
+            "shipTo": "Lieferadresse",
+            "savedAddress": "Kundenadresse",
+            "savedAddressPlaceholder": "Gespeicherte Adresse wählen…",
+            "editAddress": "Adresse bearbeiten",
+            "doneEditing": "Fertig",
+            "company": "Firma",
+            "firstName": "Vorname",
+            "lastName": "Nachname",
+            "street": "Straße",
+            "city": "Ort",
+            "zipcode": "PLZ",
+            "state": "Bundesland",
+            "unitsToShip": "Einheiten in dieser Lieferung",
+            "addShipment": "Lieferung hinzufügen",
+            "subtotal": "Positionen",
+            "taxNote": "Steuern werden je Lieferort neu berechnet.",
+            "apply": "Änderungen übernehmen",
+            "saved": "Lieferungen aktualisiert. Bestellung speichern, um die Änderungen zu behalten.",
+            "failed": "Die Lieferungen konnten nicht aktualisiert werden."
         }
     }
 }

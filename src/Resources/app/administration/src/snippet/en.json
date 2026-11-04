@@ -14,10 +14,44 @@
             "statusSaved": "Shipment to {place} updated.",
             "statusFailed": "The shipment status could not be changed.",
             "trackingSaved": "Tracking codes saved.",
-            "trackingFailed": "The tracking codes could not be saved."
+            "trackingFailed": "The tracking codes could not be saved.",
+            "introSingle": "This order ships to one address. Use Edit shipments to split it across several addresses.",
+            "edit": "Edit shipments"
         },
         "summary": {
             "shipping": "Shipping costs | Shipping costs (1 shipment) | Shipping costs ({count} shipments)"
+        },
+        "editor": {
+            "title": "Edit shipments",
+            "items": "Items",
+            "item": "Item",
+            "unitPriceNet": "Unit price (net)",
+            "unitPriceGross": "Unit price (gross)",
+            "units": "Units",
+            "lineTotal": "Line total",
+            "willBeRemoved": "removed from the order",
+            "shipments": "Shipments",
+            "new": "new",
+            "remove": "Remove",
+            "shipTo": "Ship to",
+            "savedAddress": "Customer address",
+            "savedAddressPlaceholder": "Choose a saved address…",
+            "editAddress": "Edit this address",
+            "doneEditing": "Done",
+            "company": "Company",
+            "firstName": "First name",
+            "lastName": "Last name",
+            "street": "Street",
+            "city": "City",
+            "zipcode": "Zip code",
+            "state": "State",
+            "unitsToShip": "Units in this shipment",
+            "addShipment": "Add shipment",
+            "subtotal": "Items",
+            "taxNote": "Tax is recalculated per destination.",
+            "apply": "Apply changes",
+            "saved": "Shipments updated. Save the order to keep the changes.",
+            "failed": "The shipments could not be updated."
         }
     }
 }

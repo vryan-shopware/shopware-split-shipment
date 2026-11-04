@@ -10,11 +10,7 @@ use Shopware\Core\Checkout\Cart\Delivery\Struct\ShippingLocation;
 use Shopware\Core\Checkout\Cart\LineItem\CartDataCollection;
 use Shopware\Core\Checkout\Cart\LineItem\LineItem;
 use Shopware\Core\Checkout\Cart\Price\QuantityPriceCalculator;
-use Shopware\Core\Checkout\Cart\Price\Struct\CalculatedPrice;
 use Shopware\Core\Checkout\Cart\Price\Struct\QuantityPriceDefinition;
-use Shopware\Core\Checkout\Cart\Tax\Struct\CalculatedTaxCollection;
-use Shopware\Core\Checkout\Cart\Tax\Struct\TaxRule;
-use Shopware\Core\Checkout\Cart\Tax\Struct\TaxRuleCollection;
 use Shopware\Core\Checkout\Customer\Aggregate\CustomerAddress\CustomerAddressCollection;
 use Shopware\Core\Checkout\Customer\Aggregate\CustomerAddress\CustomerAddressEntity;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepository;
@@ -124,7 +120,7 @@ class SplitShipmentLineItemProcessor implements CartDataCollectorInterface, Cart
                 $prices[$key] = $this->priceCalculator->calculate($share, $context);
             }
 
-            $lineItem->setPrice($this->merge($prices, $lineItem->getQuantity()));
+            $lineItem->setPrice(SplitPriceMerger::merge($prices, $lineItem->getQuantity()));
             $lineItem->addExtension(SplitShipmentLinePrices::EXTENSION_NAME, new SplitShipmentLinePrices($quantities, $prices));
         }
     }
@@ -177,50 +173,6 @@ class SplitShipmentLineItemProcessor implements CartDataCollectorInterface, Cart
         }
 
         return $quantities;
-    }
-
-    /**
-     * @param array<string, CalculatedPrice> $prices
-     */
-    private function merge(array $prices, int $quantity): CalculatedPrice
-    {
-        $first = reset($prices);
-        \assert($first instanceof CalculatedPrice);
-
-        $total = 0.0;
-        $taxes = new CalculatedTaxCollection();
-        $byRate = [];
-        $unitPrices = [];
-
-        foreach ($prices as $price) {
-            $total += $price->getTotalPrice();
-            $taxes = $taxes->merge($price->getCalculatedTaxes());
-            $unitPrices[(string) $price->getUnitPrice()] = true;
-            foreach ($price->getTaxRules() as $rule) {
-                $key = (string) $rule->getTaxRate();
-                $byRate[$key] = ($byRate[$key] ?? 0.0) + $price->getTotalPrice() * $rule->getPercentage() / 100;
-            }
-        }
-
-        $rules = new TaxRuleCollection();
-        foreach ($byRate as $rate => $amount) {
-            $rules->add(new TaxRule((float) $rate, $total > 0 ? $amount / $total * 100 : 100 / \count($byRate)));
-        }
-
-        // Net prices: the unit price is the same for every share. Gross prices differ
-        // per tax rate, so the line shows the average.
-        $unitPrice = \count($unitPrices) === 1 ? $first->getUnitPrice() : round($total / max(1, $quantity), 2);
-
-        return new CalculatedPrice(
-            $unitPrice,
-            $total,
-            $taxes,
-            $rules,
-            $quantity,
-            $first->getReferencePrice(),
-            $first->getListPrice(),
-            $first->getRegulationPrice()
-        );
     }
 
     private function allocations(Cart $cart, SalesChannelContext $context): ?SplitShipmentAllocations

@@ -36,5 +36,25 @@
             <argument type="service" id="DemoSplitShipment\Checkout\SplitShipment\SplitShipmentConfig"/>
             <argument type="service" id="customer_address.repository"/>
         </service>
+
+        <service id="DemoSplitShipment\Checkout\SplitShipment\Order\SplitShipmentOrderEditor">
+            <argument type="service" id="order.repository"/>
+            <argument type="service" id="customer_address.repository"/>
+            <argument type="service" id="tax.repository"/>
+            <argument type="service" id="country.repository"/>
+            <argument type="service" id="order_delivery.repository"/>
+            <argument type="service" id="order_delivery_position.repository"/>
+            <argument type="service" id="order_line_item.repository"/>
+            <argument type="service" id="Shopware\Core\Checkout\Cart\Order\OrderConverter"/>
+            <argument type="service" id="DemoSplitShipment\Checkout\SplitShipment\DestinationTaxResolver"/>
+            <argument type="service" id="Shopware\Core\Checkout\Cart\Price\QuantityPriceCalculator"/>
+            <argument type="service" id="Shopware\Core\Checkout\Cart\Tax\PercentageTaxRuleBuilder"/>
+            <argument type="service" id="Shopware\Core\Checkout\Cart\Price\AmountCalculator"/>
+            <argument type="service" id="Shopware\Core\System\StateMachine\Loader\InitialStateIdLoader"/>
+        </service>
+
+        <service id="DemoSplitShipment\Checkout\SplitShipment\Order\SplitShipmentOrderRoute" public="true">
+            <argument type="service" id="DemoSplitShipment\Checkout\SplitShipment\Order\SplitShipmentOrderEditor"/>
+        </service>
     </services>
 </container>
