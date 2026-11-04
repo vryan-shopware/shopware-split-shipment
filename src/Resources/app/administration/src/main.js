@@ -37,6 +37,8 @@ const STYLE = `
 .demo-split-shipment-editor__table td { padding: 8px; vertical-align: middle; border-bottom: 1px solid var(--color-border-primary-default, #d1d9e0); }
 .demo-split-shipment-editor__table .mt-field, .demo-split-shipment-editor__table .sw-field { margin-bottom: 0; }
 .demo-split-shipment-editor__num { width: 140px; }
+.demo-split-shipment-editor__add { display: grid; grid-template-columns: minmax(260px, 420px) 1fr; gap: 4px 16px; align-items: end; margin-top: 12px; }
+.demo-split-shipment-editor__add .sw-field { margin-bottom: 0; }
 .demo-split-shipment-editor__units { font-variant-numeric: tabular-nums; font-weight: 600; }
 .demo-split-shipment-editor__units.is-error { color: var(--color-text-critical-default, #de294c); }
 .demo-split-shipment-editor__shipment { border: 1px solid var(--color-border-primary-default, #d1d9e0); border-radius: 8px; padding: 16px; }
@@ -448,8 +450,21 @@ Component.register('demo-split-shipment-editor', {
                         :key="line.id"
                     >
                         <td>
-                            <div>{{ line.label }}</div>
-                            <div class="demo-split-shipment__muted">{{ line.productNumber }}</div>
+                            <div>
+                                {{ line.label }}
+                                <mt-badge v-if="line.isNew" variant="info">{{ $t('demo-split-shipment.editor.new') }}</mt-badge>
+                            </div>
+                            <div class="demo-split-shipment__muted">
+                                {{ line.productNumber }}
+                                <template v-if="line.isNew">
+                                    ·
+                                    <button
+                                        type="button"
+                                        class="demo-split-shipment-editor__link"
+                                        @click="removeNewLine(line)"
+                                    >{{ $t('demo-split-shipment.editor.remove') }}</button>
+                                </template>
+                            </div>
                         </td>
                         <td class="demo-split-shipment-editor__num">
                             <mt-number-field
@@ -458,7 +473,7 @@ Component.register('demo-split-shipment-editor', {
                                 :digits="2"
                                 :min="0"
                                 :model-value="line.unitPrice"
-                                @update:model-value="(value) => { line.unitPrice = value ?? 0; }"
+                                @update:model-value="(value) => { line.unitPrice = value ?? 0; line.priceTouched = true; }"
                             />
                         </td>
                         <td>
@@ -469,12 +484,24 @@ Component.register('demo-split-shipment-editor', {
                             <span
                                 v-if="lineUnits(line) === 0"
                                 class="demo-split-shipment__muted"
-                            > · {{ $t('demo-split-shipment.editor.willBeRemoved') }}</span>
+                            > · {{ line.isNew ? $t('demo-split-shipment.editor.assignUnits') : $t('demo-split-shipment.editor.willBeRemoved') }}</span>
                         </td>
                         <td class="demo-split-shipment__money">{{ money(lineUnits(line) * line.unitPrice) }}</td>
                     </tr>
                 </tbody>
             </table>
+            <div class="demo-split-shipment-editor__add">
+                <sw-entity-single-select
+                    entity="product"
+                    size="small"
+                    :label="$t('demo-split-shipment.editor.addItem')"
+                    :placeholder="$t('demo-split-shipment.editor.addItemPlaceholder')"
+                    :criteria="productCriteria"
+                    :value="null"
+                    @update:value="(id, item) => addProduct(id, item)"
+                />
+                <span class="demo-split-shipment__muted">{{ $t('demo-split-shipment.editor.addItemHint') }}</span>
+            </div>
         </section>
 
         <section class="demo-split-shipment-editor__section">
@@ -706,6 +733,16 @@ Component.register('demo-split-shipment-editor', {
         shippingTotal() {
             return (this.model?.shipments ?? []).reduce((sum, shipment) => sum + (shipment.shippingCost || 0), 0);
         },
+
+        productCriteria() {
+            const criteria = new Criteria(1, 25);
+            criteria.addFilter(Criteria.equals('active', true));
+            const inOrder = (this.model?.lineItems ?? []).map((line) => line.productId || line.id).filter(Boolean);
+            if (inOrder.length) {
+                criteria.addFilter(Criteria.not('AND', [Criteria.equalsAny('id', inOrder)]));
+            }
+            return criteria;
+        },
     },
 
     created() {
@@ -862,6 +899,30 @@ Component.register('demo-split-shipment-editor', {
             this.model.shipments.splice(index, 1);
         },
 
+        addProduct(id, item) {
+            if (!id || this.model.lineItems.some((line) => (line.productId || line.id) === id)) {
+                return;
+            }
+            const net = item?.price?.[0]?.net;
+            const gross = item?.price?.[0]?.gross;
+            this.model.lineItems.push({
+                id,
+                productId: id,
+                isNew: true,
+                priceTouched: false,
+                label: item?.translated?.name || item?.name || item?.productNumber || id,
+                productNumber: item?.productNumber || '',
+                unitPrice: (this.model.taxStatus === 'gross' ? gross : net) ?? 0,
+            });
+        },
+
+        removeNewLine(line) {
+            this.model.lineItems = this.model.lineItems.filter((item) => item !== line);
+            this.model.shipments.forEach((shipment) => {
+                delete shipment.quantities[line.id];
+            });
+        },
+
         addressPayload(shipment) {
             if (shipment.customerAddressId) {
                 return { customerAddressId: shipment.customerAddressId };
@@ -885,7 +946,17 @@ Component.register('demo-split-shipment-editor', {
             this.error = '';
             this.saving = true;
             const plan = {
-                lineItems: Object.fromEntries(this.model.lineItems.map((line) => [line.id, { unitPrice: Number(line.unitPrice) || 0 }])),
+                lineItems: Object.fromEntries(
+                    this.model.lineItems
+                        .filter((line) => !line.isNew)
+                        .map((line) => [line.id, { unitPrice: Number(line.unitPrice) || 0 }]),
+                ),
+                newLineItems: this.model.lineItems
+                    .filter((line) => line.isNew)
+                    .map((line) => ({
+                        productId: line.id,
+                        ...(line.priceTouched ? { unitPrice: Number(line.unitPrice) || 0 } : {}),
+                    })),
                 shipments: this.model.shipments.map((shipment) => ({
                     ...(shipment.id ? { id: shipment.id } : {}),
                     shippingCost: Number(shipment.shippingCost) || 0,

@@ -51,7 +51,11 @@
             "taxNote": "Steuern werden je Lieferort neu berechnet.",
             "apply": "Änderungen übernehmen",
             "saved": "Lieferungen aktualisiert. Bestellung speichern, um die Änderungen zu behalten.",
-            "failed": "Die Lieferungen konnten nicht aktualisiert werden."
+            "failed": "Die Lieferungen konnten nicht aktualisiert werden.",
+            "addItem": "Position hinzufügen",
+            "addItemPlaceholder": "Produkte suchen…",
+            "addItemHint": "Wird beim Übernehmen für diesen Kunden bepreist, außer Sie ändern den Preis. Danach Einheiten je Lieferung festlegen.",
+            "assignUnits": "Einheiten je Lieferung festlegen"
         }
     }
 }

@@ -52,6 +52,8 @@
             <argument type="service" id="Shopware\Core\Checkout\Cart\Tax\PercentageTaxRuleBuilder"/>
             <argument type="service" id="Shopware\Core\Checkout\Cart\Price\AmountCalculator"/>
             <argument type="service" id="Shopware\Core\System\StateMachine\Loader\InitialStateIdLoader"/>
+            <argument type="service" id="Shopware\Core\Checkout\Cart\LineItemFactoryRegistry"/>
+            <argument type="service" id="Shopware\Core\Checkout\Cart\Processor"/>
         </service>
 
         <service id="DemoSplitShipment\Checkout\SplitShipment\Order\SplitShipmentOrderRoute" public="true">

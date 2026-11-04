@@ -4,7 +4,13 @@ namespace DemoSplitShipment\Checkout\SplitShipment\Order;
 
 use DemoSplitShipment\Checkout\SplitShipment\DestinationTaxResolver;
 use DemoSplitShipment\Checkout\SplitShipment\SplitPriceMerger;
+use Shopware\Core\Checkout\Cart\Cart;
+use Shopware\Core\Checkout\Cart\CartBehavior;
 use Shopware\Core\Checkout\Cart\Delivery\Struct\ShippingLocation;
+use Shopware\Core\Checkout\Cart\LineItem\LineItem;
+use Shopware\Core\Checkout\Cart\LineItemFactoryRegistry;
+use Shopware\Core\Checkout\Cart\Order\Transformer\LineItemTransformer;
+use Shopware\Core\Checkout\Cart\Processor;
 use Shopware\Core\Checkout\Cart\Order\OrderConverter;
 use Shopware\Core\Checkout\Cart\Price\AmountCalculator;
 use Shopware\Core\Checkout\Cart\Price\QuantityPriceCalculator;
@@ -86,6 +92,8 @@ class SplitShipmentOrderEditor
         private readonly PercentageTaxRuleBuilder $taxRuleBuilder,
         private readonly AmountCalculator $amountCalculator,
         private readonly InitialStateIdLoader $initialStateIdLoader,
+        private readonly LineItemFactoryRegistry $lineItemFactory,
+        private readonly Processor $cartProcessor,
     ) {
     }
 
@@ -103,6 +111,7 @@ class SplitShipmentOrderEditor
         foreach ($this->shippableLines($order) as $line) {
             $lines[] = [
                 'id' => $line->getId(),
+                'productId' => $line->getProductId(),
                 'label' => $line->getLabel(),
                 'productNumber' => $line->getPayload()['productNumber'] ?? null,
                 'quantity' => $line->getQuantity(),
@@ -178,13 +187,16 @@ class SplitShipmentOrderEditor
      *
      * Plan:
      *  lineItems: { <orderLineItemId>: { unitPrice?: float } }
+     *  newLineItems: [ { productId, unitPrice?: float } ]   products to add; priced like
+     *                                    Shopware's "add product to order" unless unitPrice is set
+
      *  shipments: [ {
      *      id?: <orderDeliveryId>            existing shipment; omit to add one
      *      shippingCost: float               the shipment's charge, in the order's tax mode
      *      address:                          one of
      *          { customerAddressId }         copy a saved address of the customer
      *          { id?, ...fields }            edit the shipment's address (id = its order address)
-     *      quantities: { <orderLineItemId>: int }
+     *      quantities: { <orderLineItemId or new productId>: int }
      *  } ]
      * Shipments left out are removed; a line with no units left is removed.
      *
@@ -208,12 +220,16 @@ class SplitShipmentOrderEditor
         $existing = $order->getDeliveries();
         \assert($existing !== null);
 
+        // Products to add become new lines, priced for this customer.
+        $newLineData = [];
+        $aliases = $this->addNewLines($plan, $shipmentPlans, $order, $salesChannelContext, $lines, $newLineData);
+
         // Unit prices.
         $unitPrices = [];
         foreach ($lines as $lineId => $line) {
             $definition = $line->getPriceDefinition();
             $price = $definition instanceof QuantityPriceDefinition ? $definition->getPrice() : $line->getUnitPrice();
-            $requested = $plan['lineItems'][$lineId]['unitPrice'] ?? null;
+            $requested = $plan['lineItems'][$lineId]['unitPrice'] ?? ($newLineData[$lineId]['requestedUnitPrice'] ?? null);
             if ($requested !== null) {
                 if (!is_numeric($requested) || (float) $requested < 0) {
                     throw new BadRequestHttpException(\sprintf('Invalid unit price for "%s".', $line->getLabel()));
@@ -253,6 +269,7 @@ class SplitShipmentOrderEditor
 
             $quantities = [];
             foreach ((array) ($shipmentPlan['quantities'] ?? []) as $lineId => $quantity) {
+                $lineId = $aliases[$lineId] ?? $lineId;
                 if (!isset($lines[$lineId])) {
                     throw new BadRequestHttpException('Unknown line item in shipment ' . ($index + 1) . '.');
                 }
@@ -331,12 +348,16 @@ class SplitShipmentOrderEditor
             $price = SplitPriceMerger::merge($shares, $totals[$lineId]);
             $linePrices->add($price);
 
-            $lineItemData[] = [
+            $row = [
                 'id' => $lineId,
                 'quantity' => $totals[$lineId],
                 'price' => $price,
                 'priceDefinition' => new QuantityPriceDefinition($unitPrices[$lineId], $this->baseTaxRules($line), $totals[$lineId]),
             ];
+            if (isset($newLineData[$lineId])) {
+                $row += $newLineData[$lineId]['data'];
+            }
+            $lineItemData[] = $row;
         }
 
         foreach ($order->getLineItems() ?? [] as $other) {
@@ -451,6 +472,123 @@ class SplitShipmentOrderEditor
             }
             $this->orderRepository->upsert([$orderData], $context);
         });
+    }
+
+    /**
+     * Prices the products in plan.newLineItems for the order's customer (customer
+     * group prices, tier prices, stock limits, the product's tax), the way Shopware
+     * adds a product to an existing order, and registers each as a new line.
+     *
+     * @param array<string, mixed> $plan
+     * @param array<mixed> $shipmentPlans
+     * @param array<string, OrderLineItemEntity> $lines new lines are added here
+     * @param array<string, array<string, mixed>> $newLineData write data per new line id
+     *
+     * @return array<string, string> productId => new line id, for plan quantities
+     */
+    private function addNewLines(
+        array $plan,
+        array $shipmentPlans,
+        OrderEntity $order,
+        SalesChannelContext $salesChannelContext,
+        array &$lines,
+        array &$newLineData
+    ): array {
+        $requested = [];
+        foreach ((array) ($plan['newLineItems'] ?? []) as $item) {
+            $productId = \is_array($item) ? ($item['productId'] ?? null) : null;
+            if (!\is_string($productId) || !Uuid::isValid($productId)) {
+                throw new BadRequestHttpException('Invalid product to add.');
+            }
+            foreach ($lines as $line) {
+                if ($line->getProductId() === $productId) {
+                    throw new BadRequestHttpException(\sprintf('"%s" is already on the order; change its units instead.', $line->getLabel()));
+                }
+            }
+            $unitPrice = $item['unitPrice'] ?? null;
+            if ($unitPrice !== null && (!is_numeric($unitPrice) || (float) $unitPrice < 0)) {
+                throw new BadRequestHttpException('Invalid unit price for a new item.');
+            }
+            $requested[$productId] = ['quantity' => 0, 'unitPrice' => $unitPrice];
+        }
+        if ($requested === []) {
+            return [];
+        }
+
+        foreach ($shipmentPlans as $shipmentPlan) {
+            foreach ((array) (\is_array($shipmentPlan) ? ($shipmentPlan['quantities'] ?? []) : []) as $key => $quantity) {
+                if (isset($requested[$key]) && is_numeric($quantity)) {
+                    $requested[$key]['quantity'] += max(0, (int) $quantity);
+                }
+            }
+        }
+
+        $priced = $salesChannelContext->live(function (SalesChannelContext $live) use ($requested): Cart {
+            $cart = new Cart(Uuid::randomHex());
+            foreach ($requested as $productId => $item) {
+                if ($item['quantity'] <= 0) {
+                    continue;
+                }
+                $cart->add($this->lineItemFactory->create([
+                    'id' => $productId,
+                    'referencedId' => $productId,
+                    'type' => LineItem::PRODUCT_LINE_ITEM_TYPE,
+                    'quantity' => $item['quantity'],
+                ], $live));
+            }
+
+            return $this->cartProcessor->process($cart, $live, new CartBehavior($live->getPermissions()));
+        });
+
+        $position = 0;
+        foreach ($lines as $line) {
+            $position = max($position, $line->getPosition());
+        }
+
+        $aliases = [];
+        foreach ($requested as $productId => $item) {
+            if ($item['quantity'] <= 0) {
+                throw new BadRequestHttpException('A new item has no units in any shipment.');
+            }
+            $lineItem = $priced->getLineItems()->get($productId);
+            if ($lineItem === null || !$lineItem->getPriceDefinition() instanceof QuantityPriceDefinition) {
+                throw new BadRequestHttpException('A product to add is not available for this customer.');
+            }
+            if ($lineItem->getQuantity() < $item['quantity']) {
+                throw new BadRequestHttpException(\sprintf(
+                    '"%s": only %d can be ordered (stock or order limits).',
+                    $lineItem->getLabel(),
+                    $lineItem->getQuantity()
+                ));
+            }
+
+            $id = Uuid::randomHex();
+            $data = LineItemTransformer::transform($lineItem, null, ++$position);
+            $data = reset($data);
+            \assert(\is_array($data));
+            unset($data['id'], $data['quantity'], $data['price'], $data['priceDefinition']);
+            $data['identifier'] = $id;
+
+            $entity = new OrderLineItemEntity();
+            $entity->setId($id);
+            $entity->setIdentifier($id);
+            $entity->setLabel((string) $lineItem->getLabel());
+            $entity->setType(LineItem::PRODUCT_LINE_ITEM_TYPE);
+            $entity->setProductId($productId);
+            $entity->setReferencedId($productId);
+            $entity->setQuantity($item['quantity']);
+            $entity->setPayload($lineItem->getPayload());
+            $entity->setPriceDefinition($lineItem->getPriceDefinition());
+            $entity->setPrice($lineItem->getPrice());
+            $entity->setGood(true);
+            $entity->setPosition($position);
+
+            $lines[$id] = $entity;
+            $newLineData[$id] = ['data' => $data, 'requestedUnitPrice' => $item['unitPrice']];
+            $aliases[$productId] = $id;
+        }
+
+        return $aliases;
     }
 
     private function fetchOrder(string $orderId, Context $context): OrderEntity

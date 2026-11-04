@@ -51,7 +51,11 @@
             "taxNote": "Tax is recalculated per destination.",
             "apply": "Apply changes",
             "saved": "Shipments updated. Save the order to keep the changes.",
-            "failed": "The shipments could not be updated."
+            "failed": "The shipments could not be updated.",
+            "addItem": "Add item",
+            "addItemPlaceholder": "Search products…",
+            "addItemHint": "Priced for this customer when applied, unless you change the price. Then set its units per shipment.",
+            "assignUnits": "set units per shipment"
         }
     }
 }
