@@ -1,3 +1,7 @@
 vendor/
 node_modules/
 .DS_Store
+
+# Personal Claude Code files
+CLAUDE.local.md
+.claude/settings.local.json
