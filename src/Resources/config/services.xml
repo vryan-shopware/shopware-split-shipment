@@ -37,6 +37,11 @@
             <argument type="service" id="customer_address.repository"/>
         </service>
 
+        <service id="DemoSplitShipment\Checkout\SplitShipment\Storefront\SplitShipmentStorefrontRoute" public="true">
+            <argument type="service" id="DemoSplitShipment\Checkout\SplitShipment\SalesChannel\SplitShipmentRoute"/>
+            <argument type="service" id="customer_address.repository"/>
+        </service>
+
         <service id="DemoSplitShipment\Checkout\SplitShipment\Order\SplitShipmentOrderEditor">
             <argument type="service" id="order.repository"/>
             <argument type="service" id="customer_address.repository"/>
