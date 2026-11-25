@@ -22,6 +22,17 @@ A demo plugin for Shopware prospect demos; the demo factory (shopware-demo-creat
 | `GET /store-api/split-shipment` | Settings and the cart's current assignments. Login required. |
 | `POST /store-api/split-shipment/allocations` | Body `{"allocations": {"<lineItemId>": {"<customerAddressId>": 4}}}`. Replaces the assignments (`{}` clears them) and returns the recalculated cart, with one entry per destination in `cart.deliveries`. Only the buyer's own addresses are accepted, and a line can't be over-assigned (HTTP 400). |
 
+## Storefront routes (Twig storefront)
+
+Shopware 6.7 keeps the context token out of Twig, so storefront scripts can't call the Store API. For the Twig storefront's checkout the plugin also has session-based routes with the same rules:
+
+| Route | What |
+| --- | --- |
+| `GET /widgets/split-shipment` | Settings, the cart's assignments, the buyer's saved addresses and the checkout shipping address id. Login required. |
+| `POST /widgets/split-shipment/allocations` | Same body as the Store API route. Errors are HTTP 400 `{"errors": [{"detail": "..."}]}`. |
+
+The demo factory's Shopware CMS themes use these for a "Ship to more than one address" panel on the confirm page.
+
 Assignments are stored on the cart as `cart.extensions.splitShipment`.
 
 ## How it works
